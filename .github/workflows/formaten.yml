@@ -1,0 +1,40 @@
+name: Fotoformaten
+
+# Maakt kleinere versies (640 en 1280 px) van nieuwe of vervangen foto's en zet ze online.
+# De originelen blijven ongewijzigd.
+on:
+  push:
+    branches: [main]
+    paths: ["images/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: formaten
+  cancel-in-progress: false
+
+jobs:
+  formaten:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save --no-audit --no-fund sharp@0.33.5
+      - run: node scripts/formaten.mjs
+      - name: Versies bewaren en Pages opnieuw bouwen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add formaten
+          if git diff --cached --quiet; then echo "Geen nieuwe versies"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Fotoformaten bijgewerkt"
+          git push
+          # een push met de workflow-token start zelf geen Pages-build
+          gh api -X POST "repos/${{ github.repository }}/pages/builds"
